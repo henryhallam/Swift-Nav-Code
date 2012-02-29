@@ -182,6 +182,37 @@ int _write (int file, char *ptr, int len)
   return -1;
 }
 
+void speaking_death(char *msg) {
+  __asm__("CPSID f;");
+  //DMA2_S7CR = 0;  // disable USART DMA
+  USART1_CR3 &= ~USART_CR3_DMAT;  // disable USART DMA
+  
+  #define ERR_MSG_N 22
+
+  static char err_msg[ERR_MSG_N+4] = {DEBUG_MAGIC_1, DEBUG_MAGIC_2, MSG_PRINT, ERR_MSG_N,
+                                      '!',[5 ... ERR_MSG_N+3] = '!'};
+
+  err_msg[ERR_MSG_N+3]='\n';
+  u8 i=0;
+  while (*msg && i < ERR_MSG_N)
+    err_msg[4+(i++)] = *msg++;
+
+
+  i=0;
+  while (1) {
+    while (!(USART1_SR & USART_SR_TXE));
+    USART1_DR = err_msg[i];
+    if (++i == (ERR_MSG_N + 4)) {
+      i = 0;
+      led_toggle(LED_RED);
+      for (u32 d = 0; d < 5000000; d++)
+        __asm__("nop");
+    }
+  }
+
+
+}
+
 void screaming_death() {
   //disable all interrupts
   __asm__("CPSID f;");

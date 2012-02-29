@@ -46,5 +46,6 @@ msg_callback_t debug_find_callback(u8 msg_id);
 void debug_process_messages();
 
 void screaming_death();
+void speaking_death(char *msg);
 
 #endif
