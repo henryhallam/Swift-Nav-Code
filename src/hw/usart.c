@@ -30,12 +30,14 @@
 
 u8 usart_fifo_tx[USART_BUFFER_LEN];
 u8 usart_fifo_rx[USART_BUFFER_LEN];
+
 u16 usart_fifo_tx_rd;
+u16 usart_fifo_tx_rd_n;
 u16 usart_fifo_tx_wr;
+
 u16 usart_fifo_rx_rd;
 u32 usart_fifo_rx_rd_wraps;
 u32 usart_fifo_rx_wr_wraps;
-u16 usart_dma_xfer_len;
 
 void usart_tx_dma_schedule();
 
@@ -132,9 +134,20 @@ void usart_write_dma(u8 data[], u16 n)
    * usart_fifo_tx_wr as we want this function to be reentrant.
    */
   __asm__("CPSID i;");
-  // TODO: Check for buffer overflow
-  wr = usart_fifo_tx_wr;
-  usart_fifo_tx_wr = (usart_fifo_tx_wr + n) % USART_BUFFER_LEN;
+    wr = usart_fifo_tx_wr;
+    
+    // Check for TX buffer overflow 
+    
+      if (n >= USART_BUFFER_LEN)   // more data than the length of the buffer!
+        speaking_death("TX overflow (1)");
+      if ((wr >= usart_fifo_tx_rd) 
+          && (wr + n) > USART_BUFFER_LEN 
+          && ((wr + n) % USART_BUFFER_LEN >= usart_fifo_tx_rd))
+        speaking_death("TX overflow (2)");
+      if ((wr < usart_fifo_tx_rd) && (wr + n > usart_fifo_tx_rd))
+        speaking_death("TX overflow (3)");
+    
+    usart_fifo_tx_wr = (usart_fifo_tx_wr + n) % USART_BUFFER_LEN;
   __asm__("CPSIE i;");
 
   if (wr + n <= USART_BUFFER_LEN)
@@ -173,7 +186,7 @@ void usart_tx_dma_schedule()
   /* Save the transfer length so we can increment the read index
    * after the transfer is finished.
    */
-  usart_dma_xfer_len = DMA2_S7NDTR;
+  usart_fifo_tx_rd_n = DMA2_S7NDTR;
   /* Enable DMA stream to start transfer. */
   DMA2_S7CR |= DMA_SxCR_EN;
 
@@ -190,14 +203,14 @@ void dma2_stream7_isr()
 
     __asm__("CPSID i;");
     /* Now that the transfer has finished we can increment the read index. */
-    usart_fifo_tx_rd = (usart_fifo_tx_rd + usart_dma_xfer_len) % USART_BUFFER_LEN;
+    usart_fifo_tx_rd = (usart_fifo_tx_rd + usart_fifo_tx_rd_n) % USART_BUFFER_LEN;
     if (usart_fifo_tx_wr != usart_fifo_tx_rd)
       // FIFO not empty.
       usart_tx_dma_schedule();
     __asm__("CPSIE i;");
   } else {
     // TODO: Handle error interrupts! */
-    screaming_death();
+    speaking_death("DMA2S7 error");
   }
 }
 
