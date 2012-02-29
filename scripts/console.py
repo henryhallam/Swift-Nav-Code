@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import serial_link
+import struct
+import time
 
 import argparse
 parser = argparse.ArgumentParser(description='Swift Nav Console.')
@@ -40,19 +42,13 @@ class SwiftConsole(HasTraits):
   tracking_view = Instance(TrackingView)
   almanac_view = Instance(AlmanacView)
 
+
+
   view = View(
-    VSplit(
-      Tabbed(
-        Item('tracking_view', style='custom', show_label=False),
-        Item('tracking_view', style='custom', show_label=False, editor=InstanceEditor(view='snr_line_view')),
-        Item('almanac_view', style='custom', show_label=False),
-      ),
       HSplit(
         Item('python_console_env', editor=ShellEditor()),
         Item('console_output', style='custom', editor=InstanceEditor()),
-        Item('tracking_view', style='custom', editor=InstanceEditor(view='snr_bar_view')),
         show_labels=False
-      )
     ),
     resizable = True,
     width = 1000,
@@ -60,16 +56,31 @@ class SwiftConsole(HasTraits):
   )
 
   def print_message_callback(self, data):
-    self.console_output.write(data.encode('ascii', 'ignore'))
+    try:
+      self.console_output.write(data.encode('ascii', 'ignore'))
+    except UnicodeDecodeError:
+      self.console_output.write('[[garbled]]\n');
+
+  def spoon(self, data):
+    new_spoon = struct.unpack('<I',data)[0]
+    if new_spoon % 10000 == 0:
+      try:
+        print 'Spoon = %u, spoonterval = %.2f' % (new_spoon, time.time() - self.spoon_time)
+      except AttributeError:
+        pass
+      self.spoon_time = time.time()
+    if new_spoon != self.prev_spoon + 1:
+      print '!!! Spoon mismatch: got %u, expected %u' % (new_spoon, self.prev_spoon + 1)
+    self.prev_spoon = new_spoon
 
   def __init__(self, port=serial_link.DEFAULT_PORT):
     self.console_output = OutputStream()
 
     self.link = serial_link.SerialLink(port, serial_link.DEFAULT_BAUD)
     self.link.add_callback(serial_link.MSG_PRINT, self.print_message_callback)
-
-    self.tracking_view = TrackingView(self.link)
-    self.almanac_view = AlmanacView(self.link)
+    
+    self.prev_spoon = -1;
+    self.link.add_callback(0xE0, self.spoon)
 
     self.flash = flash.Flash(self.link)
     self.python_console_env = {
@@ -77,8 +88,6 @@ class SwiftConsole(HasTraits):
         'link': self.link,
         'flash': self.flash
     }
-    self.python_console_env.update(self.tracking_view.python_console_cmds)
-    self.python_console_env.update(self.almanac_view.python_console_cmds)
 
   def stop(self):
     self.link.close()
