@@ -30,12 +30,30 @@
 #include "hw/leds.h"
 #include "hw/spi.h"
 
+const clock_scale_t hse_16_368MHz_in_130_944MHz_out_3v3 =
+{ /* 130.944 MHz (Overclocked!!) */
+  .pllm = 16,
+  .plln = 256,
+  .pllp = 2,
+  .pllq = 6,
+  .hpre = RCC_CFGR_HPRE_DIV_NONE,
+  .ppre1 = RCC_CFGR_PPRE_DIV_8,
+  .ppre2 = RCC_CFGR_PPRE_DIV_4,
+  .flash_config = FLASH_ICE | FLASH_DCE | FLASH_LATENCY_3WS,
+  .apb1_frequency = 16368000,
+  .apb2_frequency = 2*16368000,
+};
+
+
+
 int main(void)
 {
   for (u32 i = 0; i < 600000; i++)
     __asm__("nop");
 
-	led_setup();
+  rcc_clock_setup_hse_3v3(&hse_16_368MHz_in_130_944MHz_out_3v3);
+	
+  led_setup();
 
   // Debug pins (CC1111 TX/RX)
   RCC_AHB1ENR |= RCC_AHB1ENR_IOPCEN;
@@ -62,12 +80,12 @@ int main(void)
   u32 t=timing_count();
   debug_send_msg(0x22,250,spork);
   t = timing_count() - t;
-  printf("250 chars took %u counts = %.1f us\n",(unsigned int)t, 1e6*t/rcc_ppre1_frequency);
+  printf("250 chars took %u counts = %.1f us\n",(unsigned int)t, t/16.368);
 
   t=timing_count();
   memcpy(spork2,spork,250);
   t = timing_count() - t;
-  printf("memcpy took %u counts = %.1f us\n",(unsigned int)t, 1e6*t/rcc_ppre1_frequency);
+  printf("memcpy took %u counts = %.1f us\n",(unsigned int)t, t/16.368);
 
 
   while(1)
@@ -76,7 +94,7 @@ int main(void)
     debug_send_msg(0xE0,4,(u8 *)&spoon);
     spoon++;
     
-    for (int i=1000; i; i--) __asm__("nop");
+    for (int i=18000; i; i--) __asm__("nop");
   }
 
   while (1);
