@@ -22,6 +22,7 @@
 #include <libopencm3/stm32/f2/dma.h>
 #include <libopencm3/stm32/f2/flash.h>
 #include <libopencm3/stm32/f2/gpio.h>
+#include <libopencm3/stm32/f2/timer.h>
 
 #include "main.h"
 #include "debug.h"
@@ -54,6 +55,21 @@ int main(void)
 
   unsigned int spoon=0;
   
+
+  static u8 spork[250]={[0 ... 249]='~'};
+  static u8 spork2[250];
+
+  u32 t=timing_count();
+  debug_send_msg(0x22,250,spork);
+  t = timing_count() - t;
+  printf("250 chars took %u counts = %.1f us\n",(unsigned int)t, 1e6*t/rcc_ppre1_frequency);
+
+  t=timing_count();
+  memcpy(spork2,spork,250);
+  t = timing_count() - t;
+  printf("memcpy took %u counts = %.1f us\n",(unsigned int)t, 1e6*t/rcc_ppre1_frequency);
+
+
   while(1)
   {
     debug_process_messages();
