@@ -17,6 +17,7 @@
  */
 
 #include <string.h>
+#include <stdio.h>
 #include <libopencm3/stm32/f2/gpio.h>
 #include <libopencm3/stm32/f2/rcc.h>
 #include <libopencm3/stm32/nvic.h>
@@ -27,6 +28,7 @@
 #include "../swift_nap_io.h"
 #include "leds.h"
 #include "usart.h"
+
 
 u8 usart_fifo_tx[USART_BUFFER_LEN];
 u8 usart_fifo_rx[USART_BUFFER_LEN];
@@ -210,6 +212,16 @@ void dma2_stream7_isr()
     __asm__("CPSIE i;");
   } else {
     // TODO: Handle error interrupts! */
+//    static char foo[22] = "derp= ";
+//    sprintf(foo,"DMA2_HISR=%08x",(unsigned int)DMA2_HISR);
+//    foo[5]='0'+(DMA2_HISR>>24);
+/*    if (DMA2_HISR & DMA_HISR_TEIF7)
+      speaking_death("DMA_HISR_TEIF7");
+    if (DMA2_HISR & DMA_HISR_DMEIF7)
+      speaking_death("DMA_HISR_DMEIF7");
+    if (DMA2_HISR & DMA_HISR_FEIF7)
+      speaking_death("DMA_HISR_FEIF7");
+*/
     speaking_death("DMA2S7 error");
   }
 }

@@ -94,7 +94,7 @@ int main(void)
     debug_send_msg(0xE0,4,(u8 *)&spoon);
     spoon++;
     
-    for (int i=18000; i; i--) __asm__("nop");
+    for (int i=8000; i; i--) __asm__("nop");
   }
 
   while (1);
