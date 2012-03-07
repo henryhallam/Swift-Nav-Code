@@ -16,7 +16,8 @@ OBJS = main.o \
        hw/max2769.o \
        hw/leds.o \
        hw/spi.o \
-       hw/usart.o \
+       hw/usart_tx.o \
+			 hw/usart_rx.o \
        $(SWIFTLIB_OBJS)
 
 include ../stm32/Makefile.include

@@ -30,6 +30,8 @@
 #include "hw/leds.h"
 #include "hw/spi.h"
 
+extern u8 it_wrapped;
+
 const clock_scale_t hse_16_368MHz_in_130_944MHz_out_3v3 =
 { /* 130.944 MHz (Overclocked!!) */
   .pllm = 16,
@@ -87,14 +89,24 @@ int main(void)
   t = timing_count() - t;
   printf("memcpy took %u counts = %.1f us\n",(unsigned int)t, t/16.368);
 
+  printf("DMA2_S5CR = %08X, DMA2_S7CR = %08X\n",(unsigned int)DMA2_S5CR, (unsigned int)DMA2_S7CR);
+
+  printf("DMA2_S5M0AR = %08X\n",(unsigned int)DMA2_S5M0AR);
+
+  u8 already = 0;
 
   while(1)
   {
-    debug_process_messages();
+    //debug_process_messages();
     debug_send_msg(0xE0,4,(u8 *)&spoon);
-    spoon++;
-    
-    for (int i=8000; i; i--) __asm__("nop");
+    spoon++;    
+    for (int i=4800; i; i--) __asm__("nop");
+
+    if (it_wrapped && !already) {
+      already=1;
+      printf("it wrapped\n");
+    }
+
   }
 
   while (1);
