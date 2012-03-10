@@ -22,8 +22,7 @@
 
 #include <libopencm3/cm3/common.h>
 
-void usart_dma_setup(void);
-void usart_write_dma(u8 *data, u16 n);
+void usart_rx_dma_setup(void);
 u16 usart_n_read_dma();
 u16 usart_read_dma(u8 buff[], u16 len);
 
