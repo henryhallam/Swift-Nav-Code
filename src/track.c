@@ -27,7 +27,7 @@
 #include "swift_nap_io.h"
 #include "track.h"
 
-#include <swiftlib/pvt.h>
+#include <libswiftnav/pvt.h>
 
 /* Initialiser using GNU extension, see
  * http://gcc.gnu.org/onlinedocs/gcc/Designated-Inits.html 
@@ -100,8 +100,23 @@ void tracking_channel_init(u8 channel, u8 prn, float carrier_freq, u32 start_sam
   tracking_channel[channel].update_count = 0;
   tracking_channel[channel].TOW_ms = 0;
   tracking_channel[channel].snr_threshold_count = 0;
+
+  double tau1_code, tau2_code;
+  calc_loop_coeff(2, 0.7, 1, &tau1_code, &tau2_code);
+  /*calc_loop_coeff(0.05, 0.7, 1, &tau1_code, &tau2_code);*/
+  tracking_channel[channel].dll_pgain = tau2_code/tau1_code;
+  tracking_channel[channel].dll_igain = 1e-3/tau1_code; /* loop update rate = 1e-3 sec */
+  tracking_channel[channel].dll_pgain = 1;
+  tracking_channel[channel].dll_igain = 0.004; /* loop update rate = 1e-3 sec */
   tracking_channel[channel].dll_disc = 0;
+
+  double tau1_carr, tau2_carr;
+  calc_loop_coeff(30, 0.3, 0.07, &tau1_carr, &tau2_carr);
+  /*calc_loop_coeff(25, 0.3, 0.032, &tau1_carr, &tau2_carr);*/
+  tracking_channel[channel].pll_pgain = tau2_carr/tau1_carr;
+  tracking_channel[channel].pll_igain = 1e-3/tau1_carr; /* loop update rate = 1e-3 sec */
   tracking_channel[channel].pll_disc = 0;
+
   tracking_channel[channel].I_filter = 0;
   tracking_channel[channel].Q_filter = 0;
   tracking_channel[channel].code_phase_early = 0;
@@ -113,14 +128,13 @@ void tracking_channel_init(u8 channel, u8 prn, float carrier_freq, u32 start_sam
 
   nav_msg_init(&tracking_channel[channel].nav_msg);
 
-  /* TODO: Write PRN into tracking channel when the FPGA code supports this. */
-
-  /* Starting carrier phase is set to zero as we don't 
+  /* Starting carrier phase is set to zero as we don't
    * know the carrier freq well enough to calculate it.
    */
   /* Start with code phase of zero as we have conspired for the
    * channel to be initialised on an EARLY code phase rollover.
    */
+  track_write_code_blocking(channel, prn);
   track_write_init_blocking(channel, prn, 0, 0);
   track_write_update_blocking(channel, \
                      carrier_freq*TRACK_CARRIER_FREQ_UNITS_PER_HZ, \
@@ -210,15 +224,67 @@ void tracking_channel_update(u8 channel)
       chan->pll_disc = atan((double)cs[1].Q/cs[1].I)/(2*PI);
       gpio_toggle(GPIOC, GPIO11);
 
-      chan->carrier_freq += PLL_PGAIN*(chan->pll_disc-pll_disc_prev) + PLL_IGAIN*chan->pll_disc;
+      chan->carrier_freq += chan->pll_pgain*(chan->pll_disc-pll_disc_prev) + chan->pll_igain*chan->pll_disc;
 
       double early_mag = sqrt((double)cs[0].I*cs[0].I + (double)cs[0].Q*cs[0].Q);
       double late_mag = sqrt((double)cs[2].I*cs[2].I + (double)cs[2].Q*cs[2].Q);
 
       chan->dll_disc = (early_mag - late_mag) / (early_mag + late_mag);
 
-      chan->code_phase_rate += DLL_PGAIN*(chan->dll_disc-dll_disc_prev) + DLL_IGAIN*chan->dll_disc;
+      chan->code_phase_rate += chan->dll_pgain*(chan->dll_disc-dll_disc_prev) + chan->dll_igain*chan->dll_disc;
+
+      /*chan->code_phase_rate = 0.1*chan->code_phase_rate + 0.9*1.023e6*(1+ chan->carrier_freq/L1_HZ);*/
+
+#define TAU_CROSSOVER 0.5
+#define TAU_BIAS (TAU_CROSSOVER*10)
+#define A (1e-3/TAU_CROSSOVER)
+#define B (1e-3/TAU_BIAS)
+
+      /*chan->code_phase_rate = (1-A)*chan->code_phase_rate + */
+                              /*(1-A)*(DLL_PGAIN*(chan->dll_disc-dll_disc_prev) + DLL_IGAIN*chan->dll_disc) +*/
+                              /*A*1.023e6*(1+ chan->carrier_freq/L1_HZ);*/
+
+      /*if (chan->update_count > 3000) {*/
+        /*chan->code_phase_rate = A*chan->code_phase_rate + */
+                                /*A*(1.023e6/L1_HZ)*(PLL_PGAIN*(chan->pll_disc-pll_disc_prev) + PLL_IGAIN*chan->pll_disc) +*/
+                                /*(1-A)*(DLL_PGAIN*(chan->dll_disc-dll_disc_prev) + DLL_IGAIN*chan->dll_disc);*/
+      /*} else {*/
+        /*chan->code_phase_rate += DLL_PGAIN*(chan->dll_disc-dll_disc_prev) + DLL_IGAIN*chan->dll_disc;*/
+      /*}*/
+
+      /*DO_ONLY(100,*/
+        /*printf("%f %f %f\n", chan->code_phase_rate, dll_err, pll_err);*/
+      /*);*/
+
+      /* Comp filter take one. */
+      /*double dll_err = chan->dll_pgain*(chan->dll_disc-dll_disc_prev) + chan->dll_igain*chan->dll_disc;*/
+      /*double pll_err = (1.023e6/L1_HZ)*(chan->pll_pgain*(chan->pll_disc-pll_disc_prev) + chan->pll_igain*chan->pll_disc);*/
+      /*if (chan->update_count > 3000) {*/
+        /*chan->code_phase_rate += (1.0/0.07)*pll_err + dll_err;*/
+      /*} else {*/
+        /*chan->code_phase_rate += chan->dll_pgain*(chan->dll_disc-dll_disc_prev) + chan->dll_igain*chan->dll_disc;*/
+      /*}*/
    
+      /* Comp filter take two (with bias estimation). */
+/*
+      static double bias = 0;
+      err = (chan->dll_pgain*(chan->dll_disc-dll_disc_prev) + chan->dll_igain*chan->dll_disc)
+            - chan->code_phase_rate;
+
+      chan->code_phase_rate += (1.023e6/L1_HZ)*(chan->pll_pgain*(chan->pll_disc-pll_disc_prev) + chan->pll_igain*chan->pll_disc)/1e-3 +
+                               A*err - bias;
+
+      bias += B * (err - bias);
+*/
+      /* Comp filter take three. */
+      /*double pll_deriv = chan->pll_disc-pll_disc_prev;*/
+      /*double pll_update = (1.023e6/L1_HZ)*(chan->pll_pgain*(pll_deriv) + chan->pll_igain*chan->pll_disc);*/
+
+      /*chan->dll_disc = (early_mag - late_mag) / (early_mag + late_mag);*/
+      /*chan->code_phase_rate += chan->dll_pgain*(chan->dll_disc-dll_disc_prev - pll_update)*/
+                              /*+ chan->dll_igain*chan->dll_disc*/
+                              /*+ 1e-3*pll_deriv;*/
+
       u32 timer_val = timing_count();
       static u32 max_timer_val = 0;
 
@@ -261,38 +327,27 @@ void tracking_channel_disable(u8 channel)
   tracking_channel[channel].state = TRACKING_DISABLED;
 }
 
+void tracking_update_measurement(u8 channel, channel_measurement_t *meas)
+{
+  tracking_channel_t* chan = &tracking_channel[channel];
+
+  /* Update our channel measurement. */
+  meas->prn = chan->prn;
+  meas->code_phase_chips = (double)chan->code_phase_early / TRACK_CODE_PHASE_UNITS_PER_CHIP;
+  //meas->code_phase_rate = (double)chan->code_phase_rate_fp_prev / TRACK_CODE_PHASE_RATE_UNITS_PER_HZ;
+  //meas->code_phase_rate = 1.023e6 * (1 + chan->carrier_freq/L1_HZ);
+  meas->code_phase_rate = chan->code_phase_rate;
+  meas->carrier_phase = 0;
+  meas->carrier_freq = chan->carrier_freq;
+  meas->time_of_week_ms = chan->TOW_ms;
+  meas->receiver_time = (double)chan->sample_count / SAMPLE_FREQ;
+  meas->snr = tracking_channel_snr(channel);
+}
 
 float tracking_channel_snr(u8 channel)
 {
   /* Calculate SNR from I and Q filtered magnitudes. */ 
   return (float)(tracking_channel[channel].I_filter >> I_FILTER_COEFF) / \
                 (tracking_channel[channel].Q_filter >> Q_FILTER_COEFF);
-}
-
-void calc_pseudoranges(double pseudoranges[], double pseudorange_rates[], double TOTs[])
-{
-  u32 nav_count = timing_count();
-  double mean_TOT = 0;
-
-  __asm__("CPSID i;");
-  for (u8 i=0; i<TRACK_N_CHANNELS; i++) {
-    TOTs[i] = 1e-3*tracking_channel[i].TOW_ms;
-    TOTs[i] += (((double)tracking_channel[i].code_phase_early
-                  + (double)tracking_channel[i].code_phase_rate_fp_prev * ((double)nav_count - (double)tracking_channel[i].sample_count))
-               / (double)TRACK_CODE_PHASE_UNITS_PER_CHIP) / 1.023e6;
-
-    /*TOTs[i] = 1e-3*tracking_channel[i].TOW_ms;*/
-    /*TOTs[i] += (nav_count - tracking_channel[i].sample_count) / (1.023e6 * 16.0);*/
-
-    mean_TOT += TOTs[i];
-    pseudorange_rates[i] = NAV_C * -tracking_channel[i].carrier_freq / L1_HZ;
-  }
-  __asm__("CPSIE i;");
-
-  mean_TOT = mean_TOT/TRACK_N_CHANNELS;
-
-  for (u8 i=0; i<TRACK_N_CHANNELS; i++) {
-    pseudoranges[i] = (mean_TOT - TOTs[i])*NAV_C + NOMINAL_RANGE;
-  }
 }
 

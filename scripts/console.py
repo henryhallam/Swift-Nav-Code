@@ -31,6 +31,7 @@ import struct
 from output_stream import OutputStream
 from tracking_view import TrackingView
 from almanac_view import AlmanacView
+from solution_view import SolutionView
 import flash
 
 class SwiftConsole(HasTraits):
@@ -41,10 +42,22 @@ class SwiftConsole(HasTraits):
   b = Int
   tracking_view = Instance(TrackingView)
   almanac_view = Instance(AlmanacView)
+  solution_view = Instance(SolutionView)
 
 
 
   view = View(
+<<<<<<< HEAD
+=======
+    VSplit(
+      Tabbed(
+        Item('solution_view', style='custom', show_label=False),
+        Item('tracking_view', style='custom', show_label=False),
+        Item('tracking_view', style='custom', show_label=False, editor=InstanceEditor(view='snr_line_view')),
+        Item('solution_view', style='custom', show_label=False, editor=InstanceEditor(view='prs_view')),
+        Item('almanac_view', style='custom', show_label=False),
+      ),
+>>>>>>> master
       HSplit(
         Item('python_console_env', editor=ShellEditor()),
         Item('console_output', style='custom', editor=InstanceEditor()),
@@ -59,6 +72,7 @@ class SwiftConsole(HasTraits):
     try:
       self.console_output.write(data.encode('ascii', 'ignore'))
     except UnicodeDecodeError:
+<<<<<<< HEAD
       self.console_output.write('[[garbled]]\n');
 
   def spoon(self, data):
@@ -72,24 +86,42 @@ class SwiftConsole(HasTraits):
     if new_spoon != self.prev_spoon + 1:
       print '!!! Spoon mismatch: got %u, expected %u' % (new_spoon, self.prev_spoon + 1)
     self.prev_spoon = new_spoon
+=======
+      print "Oh crap!"
+>>>>>>> master
 
   def __init__(self, port=serial_link.DEFAULT_PORT):
     self.console_output = OutputStream()
 
     self.link = serial_link.SerialLink(port, serial_link.DEFAULT_BAUD)
     self.link.add_callback(serial_link.MSG_PRINT, self.print_message_callback)
+<<<<<<< HEAD
     
     self.prev_spoon = -1;
     self.link.add_callback(0xE0, self.spoon)
+=======
+
+    self.tracking_view = TrackingView(self.link)
+    self.almanac_view = AlmanacView(self.link)
+    self.solution_view = SolutionView(self.link)
+>>>>>>> master
 
     self.flash = flash.Flash(self.link)
+    self.flash.start()
     self.python_console_env = {
         'send_message': self.link.send_message,
         'link': self.link,
         'flash': self.flash
     }
+<<<<<<< HEAD
+=======
+    self.python_console_env.update(self.tracking_view.python_console_cmds)
+    self.python_console_env.update(self.almanac_view.python_console_cmds)
+    self.python_console_env.update(self.solution_view.python_console_cmds)
+>>>>>>> master
 
   def stop(self):
+    self.flash.stop()
     self.link.close()
 
 console = SwiftConsole(serial_port)

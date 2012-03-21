@@ -7,6 +7,9 @@
 #ifndef SWIFTLIB_PVT_H
 #define SWIFTLIB_PVT_H
 
+#include "common.h"
+#include "track.h"
+
 /* GPS constants */
 #define GPS_NUM_SATS  32
 #define GPS_PI      3.14159265358979323846
@@ -22,31 +25,15 @@
 #define GNSS_MAX_OBS GPS_NUM_SATS
 #define GNSS_MAX_RECEIVERS 1
 
-typedef struct {
-  double pos[3];
-  double vel[3];
-  double clock_err;
-  double clock_rate_err;
-  double clock_drift;
-  double pseudorange;
-  double pseudorange_rate;
-  int prn;
-  int recv_idx;
-} gnss_satellite_state;
-
+#define PVT_MAX_ITERATIONS 20
 
 typedef struct {
-  double innovation[GNSS_MAX_OBS];
-  unsigned int sv_excl[GNSS_MAX_OBS];
-  unsigned int n_excl;
-  unsigned int n_recv;
-  unsigned int n_used;
   double pdop;
   double gdop;
   double tdop;
   double hdop;
   double vdop;
-} solution_plus;
+} dops_t;
 
 typedef struct __attribute__((packed)) {
   /* 
@@ -56,7 +43,7 @@ typedef struct __attribute__((packed)) {
    */
   double pos_llh[3]; // Receiver position latitude [deg], longitude [deg], altitude [m]
   double pos_xyz[3]; // Receiver position ECEF XYZ [m]
-  double pos_ned[3]; // Receiver position north [m], east [m], down [m]
+  double pos_ned[3];
 
   double vel_xyz[3]; // Receiver velocity in ECEF XYZ [m/s]
   double vel_ned[3]; // Receiver velocity in NED [m/s]
@@ -74,23 +61,14 @@ typedef struct __attribute__((packed)) {
   double err_cov[7];
 
   double time; // GPS time of week [sec]
-  uint8_t gps_solution_valid; //0 = invalid, 1 = carrier phase, 2 = code phase
-  uint8_t num_channels; // Number of SVs tracked
-  uint8_t num_PVT; // Number of SVs tracked by Blackfin and that are ready for PVT
+  u8 gps_solution_valid; //0 = invalid, 1 = carrier phase, 2 = code phase
+  u8 n_used; // Number of channels used in the soluton.
 } gnss_solution;
 
-int calc_PVT( gnss_solution *soln,
-              unsigned int n_used,
-              unsigned int n_recv,
-              gnss_satellite_state const sats[GPS_NUM_SATS],
-              const double W[GPS_NUM_SATS],
-              //double rx_time[n_recv],
-              //double rx_freq_bias[n_recv],
-              solution_plus *plus);
-
-void init_sat(gnss_satellite_state *sat, unsigned int prn, int recv_idx);
-
-#define EQUAL_WEIGHTING {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
+u8 calc_PVT(const u8 n_used,
+            const navigation_measurement_t const nav_meas[n_used],
+            gnss_solution *soln,
+            dops_t *dops);
 
 #endif
 

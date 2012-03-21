@@ -1,6 +1,6 @@
-BINARY = code_phase_propagation_test
+BINARY = cw_test
 
-OBJS = code_phase_propagation_test.o \
+OBJS = cw_test.o \
        ../../src/debug.o \
        ../../src/swift_nap_io.o \
        ../../src/ca_codes.o \
@@ -14,10 +14,6 @@ OBJS = code_phase_propagation_test.o \
        ../../src/hw/usart.o \
 
 CFLAGS += -I../../src/
-
-ifdef PRN
-	CFLAGS += -DPRN=$(PRN)
-endif
 
 SWIFTNAV_ROOT ?= ../..
 
