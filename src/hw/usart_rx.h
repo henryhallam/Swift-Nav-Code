@@ -15,10 +15,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SWIFTNAV_USART_H
-#define SWIFTNAV_USART_H
+#ifndef SWIFTNAV_USART_RX_H
+#define SWIFTNAV_USART_RX_H
 
-#define USART_BUFFER_LEN 4096
+#define USART_RX_BUFFER_LEN 4096
 
 #include <libopencm3/cm3/common.h>
 

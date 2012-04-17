@@ -27,11 +27,11 @@
 #include "../debug.h"
 #include "../swift_nap_io.h"
 #include "leds.h"
-#include "usart.h"
+#include "usart_tx.h"
 
 
 #define USART_TX_BUFFER_LEN 4096
-u8 usart_fifo_tx[USART_BUFFER_LEN];
+u8 usart_fifo_tx[USART_TX_BUFFER_LEN];
 
 u16 usart_fifo_tx_rd;
 u16 usart_fifo_tx_rd_n;
@@ -39,17 +39,16 @@ u16 usart_fifo_tx_wr;
 
 void usart_tx_dma_schedule();
 
-void usart_tx_dma_setup(void) {
-  // Set up the USART1 peripheral, the DMA and the interrupts
+void usart_common_setup(void) {
+  // General setup - peripheral clocking, pin direction, baud rate, stop bits etc
+  // but not things that are specific to DMA transmission or reception.
 
-  // First give everything a clock
-  RCC_AHB1ENR |= RCC_AHB1ENR_DMA2EN;    // Enable clock to DMA peripheral
   RCC_APB2ENR |= RCC_APB2ENR_USART1EN;  // Clock the USART
-	RCC_AHB1ENR |= RCC_AHB1ENR_IOPAEN;    // Don't forget to clock the GPIO pins corresponding to the USART
+	RCC_AHB1ENR |= RCC_AHB1ENR_IOPAEN;    // Clock the GPIO pins corresponding to the USART
 
-  // Assign the GPIO pin appropriately
-  gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9);
-	gpio_set_af(GPIOA, GPIO_AF7, GPIO9);
+  // Assign the GPIO pins appropriately
+  gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO9|GPIO10);
+	gpio_set_af(GPIOA, GPIO_AF7, GPIO9|GPIO10);
 
   /* Setup UART parameters. */
   usart_disable(USART1);
@@ -59,11 +58,25 @@ void usart_tx_dma_setup(void) {
 	usart_set_parity(USART1, USART_PARITY_NONE);
 	usart_set_flow_control(USART1, USART_FLOWCONTROL_NONE);
 	usart_set_mode(USART1, USART_MODE_TX_RX);
-  usart_enable_tx_dma(USART1);
 
 	/* Finally enable the USART. */
 	usart_enable(USART1);
 
+}
+
+
+void usart_tx_dma_setup(void) {
+  // Set up the USART1 peripheral, the DMA and the interrupts
+
+  // First give everything a clock
+  RCC_AHB1ENR |= RCC_AHB1ENR_DMA2EN;    // Enable clock to DMA peripheral
+
+  // Set up peripheral settings that are specific to TX DMA.
+  usart_disable(USART1);
+  usart_enable_tx_dma(USART1);
+  usart_enable(USART1);
+
+  // Set up the DMA controller
   /* USART1 TX - DMA2, stream 7, channel 4, low priority*/
   DMA2_S7CR = 0; /* Make sure stream is disabled to start. */
   DMA2_HIFCR = DMA_HIFCR_CTCIF7 | DMA_HIFCR_CHTIF7 | DMA_HIFCR_CTEIF7
@@ -94,11 +107,6 @@ void usart_tx_dma_setup(void) {
   /* Enable DMA2 Stream 7 (TX) interrupts with the NVIC. */
   nvic_enable_irq(NVIC_DMA2_STREAM7_IRQ);
 
-  /* Enable DMA2 Stream 5 (RX) interrupts with the NVIC. */
-  //nvic_enable_irq(NVIC_DMA2_STREAM5_IRQ);
-  nvic_disable_irq(NVIC_DMA2_STREAM5_IRQ);
-
-  //DMA2_S5CR |= DMA_SxCR_EN;
 }
 
 void usart_write_dma(u8 *data, u16 n)
@@ -115,25 +123,25 @@ void usart_write_dma(u8 *data, u16 n)
     
     // Check for TX buffer overflow 
     
-      if (n >= USART_BUFFER_LEN)   // more data than the length of the buffer!
+      if (n >= USART_TX_BUFFER_LEN)   // more data than the length of the buffer!
         speaking_death("TX overflow (1)");
       if ((wr >= usart_fifo_tx_rd) 
-          && (wr + n) > USART_BUFFER_LEN 
-          && ((wr + n) % USART_BUFFER_LEN >= usart_fifo_tx_rd))
+          && (wr + n) > USART_TX_BUFFER_LEN 
+          && ((wr + n) % USART_TX_BUFFER_LEN >= usart_fifo_tx_rd))
         speaking_death("TX overflow (2)");
       if ((wr < usart_fifo_tx_rd) && (wr + n > usart_fifo_tx_rd))
         speaking_death("TX overflow (3)");
     
-    usart_fifo_tx_wr = (usart_fifo_tx_wr + n) % USART_BUFFER_LEN;
+    usart_fifo_tx_wr = (usart_fifo_tx_wr + n) % USART_TX_BUFFER_LEN;
   __asm__("CPSIE i;");
 
-  if (wr + n <= USART_BUFFER_LEN)
+  if (wr + n <= USART_TX_BUFFER_LEN)
     memcpy(&usart_fifo_tx[wr], data, n);
   else {
     /* Deal with case where write wraps the circular buffer. */
-    memcpy(&usart_fifo_tx[wr], &data[0], USART_BUFFER_LEN - wr);
-    memcpy(&usart_fifo_tx[0], &data[USART_BUFFER_LEN-wr], n - (USART_BUFFER_LEN - wr));
-    it_wrapped=1;
+    memcpy(&usart_fifo_tx[wr], &data[0], USART_TX_BUFFER_LEN - wr);
+    memcpy(&usart_fifo_tx[0], &data[USART_TX_BUFFER_LEN-wr], n - (USART_TX_BUFFER_LEN - wr));
+    //it_wrapped=1;
   }
 
   /* Check if there is a DMA transfer either in progress or waiting
@@ -158,7 +166,7 @@ void usart_tx_dma_schedule()
     DMA2_S7NDTR = usart_fifo_tx_wr - usart_fifo_tx_rd;
   } else {
     /* DMA up until the end of the FIFO buffer. */
-    DMA2_S7NDTR = USART_BUFFER_LEN - usart_fifo_tx_rd;
+    DMA2_S7NDTR = USART_TX_BUFFER_LEN - usart_fifo_tx_rd;
   }
 
   /* Save the transfer length so we can increment the read index
@@ -181,7 +189,7 @@ void dma2_stream7_isr()
 
     __asm__("CPSID i;");
     /* Now that the transfer has finished we can increment the read index. */
-    usart_fifo_tx_rd = (usart_fifo_tx_rd + usart_fifo_tx_rd_n) % USART_BUFFER_LEN;
+    usart_fifo_tx_rd = (usart_fifo_tx_rd + usart_fifo_tx_rd_n) % USART_TX_BUFFER_LEN;
     if (usart_fifo_tx_wr != usart_fifo_tx_rd)
       // FIFO not empty.
       usart_tx_dma_schedule();
@@ -201,57 +209,4 @@ void dma2_stream7_isr()
 */
     speaking_death("DMA2S7 error");
   }
-}
-
-void dma2_stream5_isr()
-{
-  speaking_death("DMA2S5 ISR");
-
-  if (DMA2_HISR & DMA_HISR_TCIF5) {
-    /* Interrupt is Transmit Complete. We are in circular buffer mode
-     * so this probably means we just wrapped the buffer.
-     */
-
-    /* Clear the DMA transmit complete interrupt flag. */
-    DMA2_HIFCR = DMA_HIFCR_CTCIF5;
-
-    /* Increment our write wrap counter. */
-    usart_fifo_rx_wr_wraps++;
-  } else {
-    // TODO: Handle error interrupts! */
-    screaming_death();
-  }
-}
-
-u16 usart_n_read_dma()
-{
-  __asm__("CPSID i;");
-  // Compare number of bytes written to the number read, if greater
-  // than a whole buffer then we have had an overflow.
-  u32 n_read = usart_fifo_rx_rd_wraps*USART_BUFFER_LEN + usart_fifo_rx_rd;
-  u32 n_written = (usart_fifo_rx_wr_wraps+1)*USART_BUFFER_LEN - DMA2_S5NDTR;
-  __asm__("CPSIE i;");
-  if (n_written - n_read > USART_BUFFER_LEN) {
-    // My buffer runneth over.
-    screaming_death();
-  }
-  return n_written - n_read;
-}
-
-u16 usart_read_dma(u8 buff[], u16 len)
-{
-  u16 n_to_read = usart_n_read_dma();
-  u16 n = (len > n_to_read) ? n_to_read : len;
-
-  if (usart_fifo_rx_rd + n < USART_BUFFER_LEN) { 
-    memcpy(buff, &usart_fifo_rx[usart_fifo_rx_rd], n);
-    usart_fifo_rx_rd += n;
-  } else {
-    usart_fifo_rx_rd_wraps++;
-    memcpy(&buff[0], &usart_fifo_rx[usart_fifo_rx_rd], USART_BUFFER_LEN - usart_fifo_rx_rd);
-    memcpy(&buff[USART_BUFFER_LEN - usart_fifo_rx_rd], &usart_fifo_rx[0], n - USART_BUFFER_LEN + usart_fifo_rx_rd);
-    usart_fifo_rx_rd = n - USART_BUFFER_LEN + usart_fifo_rx_rd;
-  }
-
-  return n;
 }

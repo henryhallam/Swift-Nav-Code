@@ -15,11 +15,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SWIFTNAV_USART_H
-#define SWIFTNAV_USART_H
+#ifndef SWIFTNAV_USART_TX_H
+#define SWIFTNAV_USART_TX_H
 
 #include <libopencm3/cm3/common.h>
 
+void usart_common_setup(void); 
 void usart_tx_dma_setup(void);
 void usart_write_dma(u8 *data, u16 n);
 

@@ -1,4 +1,5 @@
 /*
+ *
  * Copyright (C) 2011 Fergus Noble <fergusnoble@gmail.com>
  *
  * This program is free software: you can redistribute it and/or modify
@@ -31,7 +32,7 @@
 
 u8 msg_header[4] = {DEBUG_MAGIC_1, DEBUG_MAGIC_2, 0, 0};
 
-u8 msg_buff[USART_BUFFER_LEN];
+u8 msg_buff[1024];
 
 typedef enum {
   WAITING_1,
@@ -46,7 +47,9 @@ msg_callbacks_node_t* msg_callbacks_head = 0;
 
 void debug_setup()
 {
-  usart_dma_setup();
+  usart_common_setup();
+  usart_tx_dma_setup();
+  usart_rx_dma_setup();
 
   /* Disable input and output bufferings */
   /*setvbuf(stdin, NULL, _IONBF, 0);*/
