@@ -50,7 +50,7 @@ void spi_setup(void)
   /* Setup CS line GPIOs */
 
   /* Deselect FPGA CS */
-  gpio_set(GPIOA, GPIO4);
+  gpio_set(GPIOA, GPIO4 | GPIO0);
   /* Deselect configuration flash and front-end CS */
   gpio_set(GPIOB, GPIO11 | GPIO12);
 
@@ -60,6 +60,8 @@ void spi_setup(void)
   gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO12);
   /* Front-end CS */
   gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO11);
+  /* pass-through CS */
+  gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_PULLUP, GPIO0);
 
   /* Setup SPI alternate function */
   gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO5 | GPIO6 | GPIO7);
@@ -69,7 +71,7 @@ void spi_setup(void)
   gpio_set_af(GPIOB, GPIO_AF5, GPIO13 | GPIO14 | GPIO15);
 
   /* Setup SPI parameters. */
-  spi_init_master(SPI1, SPI_CR1_BAUDRATE_FPCLK_DIV_2, 0, 0,
+  spi_init_master(SPI1, SPI_CR1_BAUDRATE_FPCLK_DIV_8, 0, 0,
                   SPI_CR1_DFF_8BIT, SPI_CR1_MSBFIRST);
   spi_enable_ss_output(SPI1); /* Required, see 25.3.1 section about NSS */
   spi_init_master(SPI2, SPI_CR1_BAUDRATE_FPCLK_DIV_2, 0, 0,
@@ -134,6 +136,10 @@ void spi_slave_select(u8 slave)
   case SPI_SLAVE_FRONTEND:
     gpio_clear(GPIOB, GPIO11);
     break;
+
+  case SPI_SLAVE_FRONTEND_ALT:
+    gpio_clear(GPIOA, GPIO0);
+    break;
   }
 }
 
@@ -143,7 +149,7 @@ void spi_slave_select(u8 slave)
 void spi_slave_deselect(void)
 {
   /* Deselect FPGA CS */
-  gpio_set(GPIOA, GPIO4);
+  gpio_set(GPIOA, GPIO4 | GPIO0);
   /* Deselect configuration flash and front-end CS */
   gpio_set(GPIOB, GPIO11 | GPIO12);
 
