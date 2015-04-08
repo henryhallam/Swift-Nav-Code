@@ -20,6 +20,7 @@
 #include "../../sbp.h"
 #include "../../init.h"
 #include "../max2769.h"
+#include "../../ext/nt1036_driver/nt1036.h"
 #include "nap_conf.h"
 #include "nap_common.h"
 #include "nap_exti.h"
@@ -82,6 +83,7 @@ void nap_setup()
   spi_setup();
   spi1_dma_setup();
 
+  nt1036_configure();
   /* Switch the STM's clock to use the Frontend clock from the NAP */
   rcc_clock_setup_hse_3v3(&hse_16_368MHz_in_130_944MHz_out_3v3);
 

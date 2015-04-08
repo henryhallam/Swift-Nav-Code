@@ -37,8 +37,8 @@ const clock_scale_t hse_16_368MHz_in_130_944MHz_out_3v3 =
   .ppre1          = RCC_CFGR_PPRE_DIV_4,
   .ppre2          = RCC_CFGR_PPRE_DIV_4,
   .flash_config   = FLASH_ACR_ICE | FLASH_ACR_DCE | FLASH_ACR_LATENCY_3WS,
-  .apb1_frequency = 32736000,
-  .apb2_frequency = 32736000,
+  .apb1_frequency = 12421875,
+  .apb2_frequency = 12421875,
 };
 
 #define AIRCR_SYSRESETREQ			(1 << 2)
