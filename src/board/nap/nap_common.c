@@ -65,7 +65,7 @@ void nap_setup()
   //spi_dma_setup();
 
   /* Configure the front end. */
-  max2769_configure();
+  //max2769_configure();
 
   /* Deactivate SPI buses so the FPGA can use the SPI2 bus to configure. */
   spi_deactivate();

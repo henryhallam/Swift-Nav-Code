@@ -27,10 +27,12 @@
 #include "flash_callbacks.h"
 
 /** Clock settings for 130.944 MHz from 16.368 MHz HSE. */
+
+/* TODO this name is no longer valid */
 const clock_scale_t hse_16_368MHz_in_130_944MHz_out_3v3 =
 {
-  .pllm           = 16,
-  .plln           = 256,
+  .pllm           = 8,
+  .plln           = 168,
   .pllp           = 2,
   .pllq           = 6,
   .hpre           = RCC_CFGR_HPRE_DIV_NONE,
