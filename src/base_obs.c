@@ -103,11 +103,11 @@ static void update_obss(obss_t *new_obss)
    * observations. */
   static u8 n_old = 0;
   static navigation_measurement_t nm_old[MAX_CHANNELS];
-
   /* Fill in the navigation measurements in base_obss, using TDCP method to
    * calculate the Doppler shift. */
   base_obss.n = tdcp_doppler(new_obss->n, new_obss->nm,
-                             n_old, nm_old, base_obss.nm);
+                             n_old, nm_old, base_obss.nm,
+                             gpsdifftime(new_obss->t, base_obss.t));
   /* Copy over the time. */
   base_obss.t = new_obss->t;
 

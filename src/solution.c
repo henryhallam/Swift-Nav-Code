@@ -403,6 +403,7 @@ static msg_t solution_thread(void *arg)
      */
     static u8 n_ready_old = 0;
     u64 nav_tc = nap_timing_count();
+    static u32 nav_tc_prev = 0;
     static navigation_measurement_t nav_meas[MAX_CHANNELS];
     chMtxLock(&es_mutex);
     calc_navigation_measurement(n_ready, meas, nav_meas,
@@ -410,8 +411,10 @@ static msg_t solution_thread(void *arg)
     chMtxUnlock();
 
     static navigation_measurement_t nav_meas_tdcp[MAX_CHANNELS];
+    double tdcp_dt = (double)((u32)nav_tc - nav_tc_prev)/SAMPLE_FREQ;
+    nav_tc_prev = nav_tc;
     u8 n_ready_tdcp = tdcp_doppler(n_ready, nav_meas, n_ready_old,
-                                   nav_meas_old, nav_meas_tdcp);
+                                   nav_meas_old, nav_meas_tdcp, tdcp_dt);
 
     /* Store current observations for next time for
      * TDCP Doppler calculation. */
