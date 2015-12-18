@@ -24,6 +24,7 @@
 #define NAP_FLASH_VERSION_STRING_ADDR 0xE0000
 #define NAP_FLASH_SERIAL_NUMBER_ADDR  0xF0000
 #define NAP_FLASH_HW_REVISION_ADDR    0xF0004
+#define NAP_FLASH_LICENSE_CODE_ADDR   0xFFFF0
 
 /* DEPRECATED: These addresses now hold the version string but are still used
  * in the case where we detect and fall back to using old stlye versioning. */
@@ -41,6 +42,7 @@ u8 nap_conf_rd_version_string(char version_string[]);
 s32 nap_conf_rd_serial_number(void);
 u32 nap_conf_rd_hw_rev(void);
 const char * nap_conf_rd_hw_rev_string(void);
+const u8 * nap_conf_rd_nap_license_code(void);
 
 #endif /* SWIFTNAV_NAP_CONF_H */
 

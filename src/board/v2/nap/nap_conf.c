@@ -135,6 +135,15 @@ const char * nap_conf_rd_hw_rev_string()
   return rev_strings[hw_rev];
 }
 
+/** Read NAP license code from M25 flash.
+ */
+const u8 * nap_conf_rd_nap_license_code()
+{
+  static u8 license_code[16];
+  m25_read(NAP_FLASH_LICENSE_CODE_ADDR, license_code, 16);
+  return (const u8 *)license_code;
+}
+
 /** \} */
 
 /** \} */

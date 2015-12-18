@@ -67,9 +67,6 @@ void nap_setup()
   /* Wait for FPGA to finish configuring (uses SPI2 bus). */
   while (!(nap_conf_done())) ;
 
-  /* Wait for FPGA to read authentication hash out of flash (uses SPI2 bus). */
-  while (!(nap_hash_rd_done())) ;
-
   /* Switch the STM's clock to use the Frontend clock from the NAP */
   stm32_clock_init();
 
@@ -86,6 +83,10 @@ void nap_setup()
    * channels, etc) from configuration flash.
    */
   nap_conf_rd_parameters();
+  
+  /* Give license code to FPGA. */
+  nap_provide_license_code(nap_conf_rd_nap_license_code());
+
 }
 
 /** Set up pins used for SPI communication with the flash chip.
@@ -135,35 +136,34 @@ void nap_conf_b_clear(void)
   palClearLine(LINE_FPGA_PROGRAM_B);
 }
 
-/** See if NAP has finished reading authentication hash from configuration
- * flash.
+/** Authenticate the NAP by supplying it with a license code.
+ * So long as this code is a correct match for the NAP's Device DNA, this
+ * will enable full functionality.
  *
- * \return 1 if hash read has finished else 0
+ * \param license_code 16-bit license code
  */
-u8 nap_hash_rd_done(void)
-{
-  return palReadLine(LINE_NAP_HASH_DONE) ? 0 : 1;
+void nap_provide_license_code(const u8 license_code[]) {
+  nap_xfer_blocking(NAP_REG_LICENSE_CODE, 16, NULL, license_code);
 }
 
-/** Return status of NAP authentication hash comparison.
+/** Return NAP AUTH_STATUS register
  *
- * \return Status of NAP authentication hash comparison.
+ * \param dna   Array to insert device DNA into (length 8).  May be null.
+ * \return  AUTH_OK: 1 if NAP authentication checks passed, 0 otherwise.
  */
-u8 nap_hash_status(void)
+u8 nap_auth_status(u8 dna[])
 {
-  u8 temp[1] = { 0 };
-
-  nap_xfer_blocking(NAP_REG_HASH_STATUS, 1, temp, temp);
-  return temp[0];
-}
-
-/** Get Device DNA from Spartan 6 FPGA.
- *
- * \param dna Array to insert DNA into (length 8).
- */
-void nap_rd_dna(u8 dna[])
-{
-  nap_xfer_blocking(NAP_REG_DNA, 8, dna, dna);
+  u8 temp[7] = { 0 };
+  nap_xfer_blocking(NAP_REG_AUTH_STATUS, 7, temp, temp);
+  if (dna != NULL) {
+    /* The DNA is defined to be 57 bits long, but the two MSBs are
+       always 10.  The NAP doesn't report those two bits, so we'll
+       reintroduce them. */
+    memcpy(&dna[1], &temp[0], 7);
+    dna[0] = 1;
+    dna[1] &= 0x7F;  // Also discard AUTH_OK from DNA
+  }
+  return (temp[0] & 0x80) ? 1 : 0;
 }
 
 /** Send Device DNA from Spartan 6 FPGA over Piksi binary USARTs.
@@ -174,7 +174,7 @@ void nap_rd_dna_callback(u16 sender_id, u8 len, u8 msg[], void* context)
 {
   (void)sender_id; (void)len; (void)msg; (void) context;
   u8 dna[8];
-  nap_rd_dna(dna);
+  (void)nap_auth_status(dna);
 
   sbp_send_msg(SBP_MSG_NAP_DEVICE_DNA_RESP, 8, dna);
 }

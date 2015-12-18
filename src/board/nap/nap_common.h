@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2011-2014 Swift Navigation Inc.
  * Contact: Fergus Noble <fergus@swift-nav.com>
@@ -46,9 +47,8 @@ void nap_setup(void);
 
 u32 nap_error_rd_blocking(void);
 
-u8 nap_hash_status(void);
-
-void nap_rd_dna(u8 dna[]);
+void nap_provide_license_code(const u8 license_code[]);
+u8 nap_auth_status(u8 dna[]);
 
 void nap_callbacks_setup(void);
 

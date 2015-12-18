@@ -28,8 +28,8 @@
 #define NAP_REG_TIMING_COMPARE      0xF8
 #define NAP_REG_TIMING_COUNT        0xF9
 #define NAP_REG_TIMING_COUNT_LATCH  0xFA
-#define NAP_REG_HASH_STATUS         0xFB
-#define NAP_REG_DNA                 0xFD
+#define NAP_REG_LICENSE_CODE        0xFC
+#define NAP_REG_AUTH_STATUS         0xFD
 #define NAP_REG_RDWR                0xFE
 #define NAP_REG_DECEASED_COW        0xFF
 /* Status of NAP authentication hash comparison. */

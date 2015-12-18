@@ -139,16 +139,21 @@ static void nap_version_check(void)
  */
 static void nap_auth_check(void)
 {
-  u8 nhs = nap_hash_status();
-  if (nhs != NAP_HASH_MATCH) {
+  u8 auth_ok, dna[8];
+  auth_ok = nap_auth_status(dna);
+  if (!auth_ok) {
+    log_error("NAP authentication failed! Tracking disabled. "
+              "DNA = 0x%02X%02X%02X%02X%02X%02X%02X%02X",
+              dna[0], dna[1], dna[2], dna[3], dna[4], dna[5], dna[6], dna[7]);
+    nap_track_n_channels = 0;
     led_on(LED_GREEN);
     led_off(LED_RED);
     while (1) {
       DO_EVERY(10000000,
-        log_error("NAP Verification Failed");
-        led_toggle(LED_GREEN);
-        led_toggle(LED_RED);
-      );
+	       log_error("NAP Verification Failed");
+	       led_toggle(LED_GREEN);
+	       led_toggle(LED_RED);
+	       );
     }
   }
 }
