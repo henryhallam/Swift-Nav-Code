@@ -63,11 +63,8 @@ inline u32 nap_read_u32(u8 reg_id)
 }
 
 void nap_track_code_wr_blocking(u8 channel, gnss_signal_t sid);
-void nap_track_init_wr_blocking(u8 channel, u8 prn, s32 carrier_phase,
-                                u16 code_phase);
 void nap_track_update_wr_blocking(u8 channel, s32 carrier_freq,
-                                  u32 code_phase_rate, u8 rollover_count,
-                                  u8 corr_spacing);
+                                  u32 code_phase_rate, u8 rollover_count);
 void nap_track_corr_rd_blocking(u8 channel, u32* sample_count, corr_t corrs[]);
 
 #endif

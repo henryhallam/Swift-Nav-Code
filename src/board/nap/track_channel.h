@@ -30,14 +30,20 @@ void nap_track_init(u8 channel, gnss_signal_t sid, u32 ref_timing_count,
                     float carrier_freq, float code_phase);
 
 void nap_track_update(u8 channel, double carrier_freq,
-                      double code_phase_rate, u8 rollover_count,
-                      u8 corr_spacing);
+                      double code_phase_rate, u8 rollover_count);
+
 void nap_track_read_results(u8 channel,
                             u32* count_snapshot, corr_t corrs[],
                             double *code_phase_early,
                             double *carrier_phase);
 
 void nap_track_disable(u8 channel);
+
+#define NAP_CORR_E 0
+#define NAP_CORR_X 1
+#define NAP_CORR_P 2
+#define NAP_CORR_Y 3
+#define NAP_CORR_L 4
 
 #endif  /* SWIFTNAV_TRACK_CHANNEL_H */
 

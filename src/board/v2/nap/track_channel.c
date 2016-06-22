@@ -97,11 +97,11 @@ void nap_track_init(u8 channel, gnss_signal_t sid, u32 ref_timing_count,
   track_count += (NAP_FRONTEND_SAMPLE_RATE_Hz / GPS_CA_CHIPPING_RATE) * (1023.0-cp) *
                  (1.0 + carrier_freq / GPS_L1_HZ);
 
-  nap_track_code_wr_blocking(channel, sid);
-  nap_track_init_wr_blocking(channel, 0, 0, 0);
-
   double cp_rate = (1.0 + carrier_freq / GPS_L1_HZ) * GPS_CA_CHIPPING_RATE;
-  nap_track_update(channel, carrier_freq, cp_rate, 0, 0);
+  nap_track_update(channel, carrier_freq, cp_rate, 0);
+
+  /* Write PRN and arm the channel. */
+  nap_track_code_wr_blocking(channel, sid);
 
   /* Schedule the timing strobe for start_sample_count. */
   track_count -= NAP_FRONTEND_SAMPLE_RATE_Hz / (2 * GPS_CA_CHIPPING_RATE);
@@ -135,8 +135,7 @@ void nap_track_init(u8 channel, gnss_signal_t sid, u32 ref_timing_count,
  * \param code_phase_rate Next correlation period's code phase rate.
  */
 void nap_track_update(u8 channel, double carrier_freq,
-                      double code_phase_rate, u8 rollover_count,
-                      u8 corr_spacing)
+                      double code_phase_rate, u8 rollover_count)
 {
   struct nap_ch_state *s = &nap_ch_state[channel];
   s->carr_pinc_prev = s->carr_pinc;
@@ -145,7 +144,7 @@ void nap_track_update(u8 channel, double carrier_freq,
   s->code_pinc = code_phase_rate * NAP_TRACK_CODE_PHASE_RATE_UNITS_PER_HZ;
 
   nap_track_update_wr_blocking(channel, s->carr_pinc, s->code_pinc,
-                               rollover_count, corr_spacing);
+                               rollover_count);
 }
 
 /** Read data from a NAP track channel's CORR register.
@@ -178,7 +177,7 @@ void nap_track_read_results(u8 channel,
 
 void nap_track_disable(u8 channel)
 {
-  nap_track_update_wr_blocking(channel, 0, 0, 0, 0);
+  nap_track_update_wr_blocking(channel, 0, 0, 0);
 }
 
 /** \} */

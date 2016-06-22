@@ -70,7 +70,7 @@ static bool use_alias_detection = true;
 
 typedef struct {
   aided_tl_state_t tl_state;   /**< Tracking loop filter state. */
-  corr_t cs[3];                /**< EPL correlation results in correlation period. */
+  corr_t cs[5];                /**< EPL correlation results in correlation period. */
   cn0_est_state_t cn0_est;     /**< C/N0 Estimator. */
   u8 int_ms;                   /**< Integration length. */
   bool short_cycle;            /**< Set to true when a short 1ms integration is requested. */
@@ -193,13 +193,13 @@ static void tracker_gps_l1ca_update(const tracker_channel_info_t *channel_info,
   if ((data->int_ms > 1) && !data->short_cycle) {
     /* If we just requested the short cycle, this is the long cycle's
      * correlations. */
-    corr_t cs[3];
+    corr_t cs[5];
     tracker_correlations_read(channel_info->context, cs,
                               &common_data->sample_count,
                               &common_data->code_phase_early,
                               &common_data->carrier_phase);
     /* accumulate short cycle correlations with long */
-    for(int i = 0; i < 3; i++) {
+    for(int i = 0; i < 5; i++) {
       data->cs[i].I += cs[i].I;
       data->cs[i].Q += cs[i].Q;
     }
@@ -208,7 +208,7 @@ static void tracker_gps_l1ca_update(const tracker_channel_info_t *channel_info,
                               &common_data->sample_count,
                               &common_data->code_phase_early,
                               &common_data->carrier_phase);
-    alias_detect_first(&data->alias_detect, data->cs[1].I, data->cs[1].Q);
+    alias_detect_first(&data->alias_detect, data->cs[NAP_CORR_P].I, data->cs[NAP_CORR_P].Q);
   }
   common_data->TOW_ms = tracker_tow_update(channel_info->context,
                                    common_data->TOW_ms,
@@ -231,14 +231,14 @@ static void tracker_gps_l1ca_update(const tracker_channel_info_t *channel_info,
 
   common_data->update_count += data->int_ms;
 
-  tracker_bit_sync_update(channel_info->context, data->int_ms, data->cs[1].I);
+  tracker_bit_sync_update(channel_info->context, data->int_ms, data->cs[NAP_CORR_P].I);
 
   /* Correlations should already be in chan->cs thanks to
    * tracking_channel_get_corrs. */
   corr_t* cs = data->cs;
 
   /* Update C/N0 estimate */
-  common_data->cn0 = cn0_est(&data->cn0_est, cs[1].I/data->int_ms, cs[1].Q/data->int_ms);
+  common_data->cn0 = cn0_est(&data->cn0_est, cs[NAP_CORR_P].I/data->int_ms, cs[NAP_CORR_P].Q/data->int_ms);
   if (common_data->cn0 > track_cn0_drop_thres)
     common_data->cn0_above_drop_thres_count = common_data->update_count;
 
@@ -252,7 +252,7 @@ static void tracker_gps_l1ca_update(const tracker_channel_info_t *channel_info,
 
   /* Update PLL lock detector */
   bool last_outp = data->lock_detect.outp;
-  lock_detect_update(&data->lock_detect, cs[1].I, cs[1].Q, data->int_ms);
+  lock_detect_update(&data->lock_detect, cs[NAP_CORR_P].I, cs[NAP_CORR_P].Q, data->int_ms);
   if (data->lock_detect.outo)
     common_data->ld_opti_locked_count = common_data->update_count;
   if (!data->lock_detect.outp)
@@ -271,8 +271,8 @@ static void tracker_gps_l1ca_update(const tracker_channel_info_t *channel_info,
   /* TODO: Make this more elegant. */
   correlation_t cs2[3];
   for (u32 i = 0; i < 3; i++) {
-    cs2[i].I = cs[2-i].I;
-    cs2[i].Q = cs[2-i].Q;
+    cs2[i].I = cs[4-2*i].I;
+    cs2[i].Q = cs[4-2*i].Q;
   }
 
   /* Output I/Q correlations using SBP if enabled for this channel */
@@ -289,8 +289,8 @@ static void tracker_gps_l1ca_update(const tracker_channel_info_t *channel_info,
   if (use_alias_detection &&
       (data->lock_detect.outp ||
        (data->lock_detect.outo && data->stage > 0))) {
-    s32 I = (cs[1].I - data->alias_detect.first_I) / (data->int_ms - 1);
-    s32 Q = (cs[1].Q - data->alias_detect.first_Q) / (data->int_ms - 1);
+    s32 I = (cs[NAP_CORR_P].I - data->alias_detect.first_I) / (data->int_ms - 1);
+    s32 Q = (cs[NAP_CORR_P].Q - data->alias_detect.first_Q) / (data->int_ms - 1);
     float err = alias_detect_second(&data->alias_detect, I, Q);
     if (fabs(err) > (250 / data->int_ms)) {
       if (data->lock_detect.outp) {
