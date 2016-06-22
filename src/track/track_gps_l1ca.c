@@ -67,6 +67,7 @@ static float track_cn0_drop_thres = 31.0;
 static char loop_params_string[120] = LOOP_PARAMS_MED;
 static char lock_detect_params_string[24] = LD_PARAMS_DISABLE;
 static bool use_alias_detection = true;
+static bool use_narrow_correlators = true;
 
 typedef struct {
   aided_tl_state_t tl_state;   /**< Tracking loop filter state. */
@@ -122,6 +123,7 @@ void track_gps_l1ca_register(void)
   SETTING("track", "cn0_use", track_cn0_use_thres, TYPE_FLOAT);
   SETTING("track", "cn0_drop", track_cn0_drop_thres, TYPE_FLOAT);
   SETTING("track", "alias_detect", use_alias_detection, TYPE_BOOL);
+  SETTING("track", "anti_multipath", use_narrow_correlators, TYPE_BOOL);
 
   for (u32 i=0; i<NUM_GPS_L1CA_TRACKERS; i++) {
     gps_l1ca_trackers[i].active = false;
@@ -270,10 +272,19 @@ static void tracker_gps_l1ca_update(const tracker_channel_info_t *channel_info,
 
   /* TODO: Make this more elegant. */
   correlation_t cs2[3];
-  for (u32 i = 0; i < 3; i++) {
-    cs2[i].I = cs[4-2*i].I;
-    cs2[i].Q = cs[4-2*i].Q;
+
+  if (data->stage > 0 && use_narrow_correlators) {
+    for (u32 i = 0; i < 3; i++) {
+      cs2[i].I = cs[3-i].I;
+      cs2[i].Q = cs[3-i].Q;
+    }
+  } else {
+    for (u32 i = 0; i < 3; i++) {
+      cs2[i].I = cs[4-2*i].I;
+      cs2[i].Q = cs[4-2*i].Q;
+    }
   }
+
 
   /* Output I/Q correlations using SBP if enabled for this channel */
   if (data->int_ms > 1) {
@@ -324,7 +335,7 @@ static void tracker_gps_l1ca_update(const tracker_channel_info_t *channel_info,
 
     /* Recalculate filter coefficients */
     aided_tl_retune(&data->tl_state, 1e3 / data->int_ms,
-                    l->code_bw, l->code_zeta, l->code_k,
+                    l->code_bw, l->code_zeta, l->code_k * (use_narrow_correlators ? 8 : 1),
                     l->carr_to_code,
                     l->carr_bw, l->carr_zeta, l->carr_k,
                     l->carr_fll_aid_gain);
