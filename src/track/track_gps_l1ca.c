@@ -64,7 +64,7 @@ static struct lock_detect_params {
 static float track_cn0_use_thres = 31.0; /* dBHz */
 static float track_cn0_drop_thres = 31.0;
 
-static char loop_params_string[120] = LOOP_PARAMS_MED;
+static char loop_params_string[120] = LOOP_PARAMS_FAST;
 static char lock_detect_params_string[24] = LD_PARAMS_DISABLE;
 static bool use_alias_detection = true;
 

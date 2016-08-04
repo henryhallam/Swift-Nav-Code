@@ -475,6 +475,21 @@ static void solution_thread(void *arg)
     u8 n_ready_tdcp = tdcp_doppler(n_ready, nav_meas, n_ready_old,
                                    nav_meas_old, nav_meas_tdcp,
                                    (double)(rec_tc - rec_tc_old) / SAMPLE_FREQ);
+    /* TDCP glitch check */
+    {
+      u8 i,j;
+      for (i=0, j=0; i<n_ready && j<n_ready_tdcp; i++, j++) {
+        if (sid_compare(nav_meas[i].sid, nav_meas_tdcp[j].sid) < 0)
+          j--;
+        else if (sid_compare(nav_meas[i].sid, nav_meas_tdcp[j].sid) > 0)
+          i--;
+        else {
+          double deltadop = nav_meas_tdcp[j].doppler - nav_meas[i].doppler;
+          if (deltadop > 15.0)
+            log_info("PRN %02d tdcp mismatch = %.1f Hz", nav_meas[i].sid.sat, deltadop);
+        }
+      }
+    }
 
     /* Store current observations for next time for
      * TDCP Doppler calculation. */
@@ -509,6 +524,19 @@ static void solution_thread(void *arg)
     if (ret == 1)
 	  log_warn("calc_PVT: RAIM repair");
 
+    double speed = vector_norm(3, position_solution.vel_ecef);
+    
+    if (speed > 2.0) {
+      log_info("Vel spike detected: %.1f %.1f %.1f",
+               position_solution.vel_ecef[0], position_solution.vel_ecef[1], position_solution.vel_ecef[2]);
+      s8 pvt_ret = calc_PVT(n_ready, nav_meas, disable_raim,
+                        &position_solution, &dops);
+      log_info("Without TDCP: %.1f %.1f %.1f (n_sats = %d, ret = %d, PDOP = %.1f)",
+               position_solution.vel_ecef[0], position_solution.vel_ecef[1], position_solution.vel_ecef[2],
+               n_ready, pvt_ret, dops.pdop);
+    }
+
+    
     if (time_quality < TIME_FINE) {
       /* If the time quality is not FINE then our receiver clock bias isn't
        * known. We should only use this PVT solution to update our time
